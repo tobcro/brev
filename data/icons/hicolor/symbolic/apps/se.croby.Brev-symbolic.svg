@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- the letter, with two lines of "text" cut out -->
+  <path fill="#2e3436" fill-rule="evenodd" d="M5 1 h6 a1 1 0 0 1 1 1 v6.2 L8 10.3 L4 8.2 V2 a1 1 0 0 1 1 -1 Z M6 3 v1 h4 V3 Z M6 5 v1 h3 V5 Z"/>
+  <!-- the envelope's front pocket -->
+  <path fill="#2e3436" d="M1 7.4 L8 11.6 L15 7.4 V13 a2 2 0 0 1 -2 2 H3 a2 2 0 0 1 -2 -2 Z"/>
+</svg>

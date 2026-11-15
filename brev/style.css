@@ -1,0 +1,56 @@
+/* Small touches on top of libadwaita's stylesheet. */
+
+.unread-dot {
+  min-width: 8px;
+  min-height: 8px;
+  border-radius: 9999px;
+  background-color: var(--accent-bg-color);
+}
+
+.message-row {
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+
+.message-row .unread {
+  font-weight: bold;
+}
+
+.message-row .star {
+  color: var(--yellow-4);
+}
+
+.unread-count {
+  font-size: 0.85em;
+  font-weight: bold;
+  color: var(--accent-color);
+}
+
+.message-body {
+  font-size: 1.05em;
+  line-height: 1.4;
+}
+
+.compose-body {
+  font-size: 1.05em;
+}
+
+.html-card {
+  border-radius: 12px;
+  background-color: white;
+}
+
+.attachment-preview {
+  padding: 0;
+  border-radius: 9px;
+}
+
+.sender-button {
+  padding: 2px 6px;
+  margin-left: -6px;
+}
+
+.address-chip {
+  padding: 0 6px;
+  min-height: 22px;
+}

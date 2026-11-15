@@ -1,0 +1,13 @@
+[Desktop Entry]
+Name=Brev
+GenericName=Mail
+Comment=Email for GNOME, using your Online Accounts
+Exec=brev %u
+Icon=se.croby.Brev
+Terminal=false
+Type=Application
+Categories=GNOME;GTK;Network;Email;
+Keywords=mail;email;inbox;imap;
+MimeType=x-scheme-handler/mailto;
+StartupNotify=true
+DBusActivatable=false

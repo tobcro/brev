@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="front" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffbe6f"/><stop offset="1" stop-color="#ff7800"/>
+    </linearGradient>
+    <linearGradient id="sheet" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f6f5f4"/>
+    </linearGradient>
+  </defs>
+  <!-- envelope back -->
+  <rect x="10" y="40" width="108" height="64" rx="10" fill="#c64600"/>
+  <!-- the letter -->
+  <rect x="25" y="16" width="78" height="72" rx="5" fill="#deddda"/>
+  <rect x="25" y="13" width="78" height="72" rx="5" fill="url(#sheet)"/>
+  <rect x="36" y="26" width="56" height="6" rx="3" fill="#77767b"/>
+  <rect x="36" y="38" width="56" height="5" rx="2.5" fill="#c0bfbc"/>
+  <rect x="36" y="49" width="40" height="5" rx="2.5" fill="#c0bfbc"/>
+  <!-- front pocket with depth -->
+  <path d="M10 56 L59.5 81 Q64 83.2 68.5 81 L118 56 V100 a10 10 0 0 1 -10 10 H20 a10 10 0 0 1 -10 -10 Z" fill="#c64600"/>
+  <path d="M10 50 L59.5 75 Q64 77.2 68.5 75 L118 50 V94 a10 10 0 0 1 -10 10 H20 a10 10 0 0 1 -10 -10 Z" fill="url(#front)"/>
+</svg>
