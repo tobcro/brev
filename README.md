@@ -54,6 +54,7 @@ It is deliberately **lean**:
 | Adding someone who just wrote to you | ✔ Click their name in the email, *Add to Contacts*. Done |
 | Mail on the train | ✔ The last 7 days (or as many as you like) are kept for offline reading; replies wait in the Outbox |
 | Knowing when something arrives | ✔ A quiet GNOME notification; the folder refreshes every 15 seconds, less often, or only when you ask |
+| Tidying up | ✔ Drag an email onto a folder, or right-click it to move, archive, trash or mark it unread |
 | Only the stuff you haven't read | ✔ One button, and the list shows unread mail only |
 | Fitting in | ✔ libadwaita, dark mode, your icon theme, and a layout that works down to phone size |
 | A to-do list, a calendar and an AI butler | Not here. GNOME has apps for the first two. |

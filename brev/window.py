@@ -12,11 +12,13 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("Goa", "1.0")
-from gi.repository import Adw, Gio, GLib, GObject, Goa, Gtk, Pango  # noqa: E402
+gi.require_version("Graphene", "1.0")
+from gi.repository import Adw, Gdk, Gio, GLib, GObject, Goa, Graphene, Gtk, Pango  # noqa: E402
 
 from .compose import ComposeDialog  # noqa: E402
 from .contacts import DemoContactSource, load_sources  # noqa: E402
 from .contacts_view import ContactsDialog  # noqa: E402
+from .folder_picker import FolderPicker  # noqa: E402
 from .html_view import AVAILABLE as HTML_AVAILABLE  # noqa: E402
 from .offline import CachingBackend, OfflineError  # noqa: E402
 from .util import describe_error, format_full_date  # noqa: E402
@@ -77,9 +79,11 @@ class BrevWindow(Adw.ApplicationWindow):
         self.unread_only = False  # list only unread messages in the current folder
         self._syncing = False
         self._remote_allowed: set[tuple] = set()
+        self._dragging = None  # (service, folder, summary) while a message is being dragged
 
         self._build_ui()
         self._setup_actions()
+        self._setup_message_menu()
         self._update_actions()
         self._monitor.connect("network-changed", self._on_network_changed)
         application.settings.connect("notify::always-show-images", lambda *_a: self.current_content is not None
@@ -179,6 +183,7 @@ class BrevWindow(Adw.ApplicationWindow):
         self.message_list.update_property([Gtk.AccessibleProperty.LABEL], [_("Messages")])
         self.more_spinner = Gtk.Revealer(child=Adw.Spinner(margin_top=12, margin_bottom=12))
         list_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self._list_box = list_box  # parent of the message menu; the list box itself only takes rows
         list_box.append(self.message_list)
         list_box.append(self.more_spinner)
         list_scroller = Gtk.ScrolledWindow(child=list_box, hscrollbar_policy=Gtk.PolicyType.NEVER)
@@ -237,6 +242,7 @@ class BrevWindow(Adw.ApplicationWindow):
         more = Gio.Menu()
         if HTML_AVAILABLE:
             more.append(_("Show as _Plain Text"), "win.plain-text")
+        more.append(_("_Move to…"), "win.move-to")
         more.append(_("Open in _Browser"), "win.open-in-browser")
         more.append(_("_Save Message As…"), "win.save-message")
         self.header_end = Gtk.Box(spacing=6)
@@ -336,6 +342,7 @@ class BrevWindow(Adw.ApplicationWindow):
             ("forward", lambda *_a: self._reply("forward")),
             ("archive", lambda *_a: self._move_current("archive")),
             ("trash", lambda *_a: self._move_current("trash")),
+            ("move-to", lambda *_a: self._choose_folder(self.current_summary)),
             ("toggle-read", lambda *_a: self._toggle_flag("\\Seen")),
             ("toggle-star", lambda *_a: self._toggle_flag("\\Flagged")),
             ("refresh", lambda *_a: self.refresh(user=True)),
@@ -367,19 +374,14 @@ class BrevWindow(Adw.ApplicationWindow):
         has_accounts = bool(self.services)
         has_message = self.current_summary is not None
         has_content = self.current_content is not None
-        role = self.current_folder.role if self.current_folder else None
-        can_archive = (
-            has_message and role not in ("archive", "all", "trash", "drafts", "sent")
-            and self.current_service is not None
-            and (self.current_service.folder_for_role("archive") or self.current_service.folder_for_role("all"))
-        )
+        can_archive = has_message and self._can_archive()
         self._enable("compose", has_accounts)
         self._enable("refresh", has_accounts)
         self._enable("search", self.current_folder is not None)
         for name in ("reply", "reply-all", "forward", "open-in-browser", "save-message"):
             self._enable(name, has_content)
         self._enable("archive", can_archive)
-        for name in ("trash", "toggle-read", "toggle-star"):
+        for name in ("trash", "toggle-read", "toggle-star", "move-to"):
             self._enable(name, has_message)
         self._sync_toggle_buttons()
 
@@ -481,6 +483,7 @@ class BrevWindow(Adw.ApplicationWindow):
         for position, folder in enumerate(folders):
             row = FolderRow(service, folder, (index, position))
             self.folder_rows[(service, folder.name)] = row
+            self._make_drop_target(row)
             self.folder_list.append(row)
         if self.current_service is service and self.current_folder is not None:
             row = self.folder_rows.get((service, self.current_folder.name))
@@ -702,6 +705,7 @@ class BrevWindow(Adw.ApplicationWindow):
         role = self.current_folder.role if self.current_folder else None
         row = MessageRow(summary, show_recipient=role in ("sent", "drafts"))
         self.rows[summary.uid] = row
+        self._make_draggable(row)
         self.message_list.append(row)
 
     def _on_messages_loaded(self, result):
@@ -915,8 +919,20 @@ class BrevWindow(Adw.ApplicationWindow):
     # ------------------------------------------------------------- moves
 
     def _move_current(self, role):
-        summary = self.current_summary
-        if summary is None or self.get_visible_dialog() is not None:
+        if self.get_visible_dialog() is not None:
+            return
+        self._move_by_role(self.current_summary, role)
+
+    def _can_archive(self) -> bool:
+        role = self.current_folder.role if self.current_folder else None
+        return (role not in ("archive", "all", "trash", "drafts", "sent")
+                and self.current_service is not None
+                and bool(self.current_service.folder_for_role("archive")
+                         or self.current_service.folder_for_role("all")))
+
+    def _move_by_role(self, summary, role):
+        """Archive or trash a message of the folder on show (in the Trash: delete it, after asking)."""
+        if summary is None or summary.uid not in self.rows:
             return
         service, folder = self.current_service, self.current_folder
         if role == "trash" and folder.role == "trash":
@@ -929,12 +945,163 @@ class BrevWindow(Adw.ApplicationWindow):
             self.toast(_("This account has no Trash folder.") if role == "trash"
                        else _("This account has no Archive folder."))
             return
+        self._move_summary(summary, destination,
+                           _("Message archived") if role == "archive" else _("Message moved to Trash"))
+
+    def _move_summary(self, summary, destination, message=None):
+        """Move a message of the folder on show to another folder of the same account."""
+        service, folder = self.current_service, self.current_folder
+        if summary.uid not in self.rows or destination.name == folder.name:
+            return
         self._remove_row(summary)
         if summary.unread:
             self._adjust_unread(service, folder, -1)
+            self._adjust_unread(service, destination, 1)
         ok, bad = self._track(lambda _r: None, self._on_change_failed)
         service.call("move", folder.name, [summary.uid], destination.name, done=ok, error=bad)
-        self.toast(_("Message archived") if role == "archive" else _("Message moved to Trash"))
+        self.toast(message or _("Message moved to {folder}").format(folder=destination.title))
+
+    def _choose_folder(self, summary):
+        """Ask which folder to move a message to."""
+        if summary is None or self.current_service is None or self.get_visible_dialog() is not None:
+            return
+        service = self.current_service
+        picker = FolderPicker(service.folders, exclude=self.current_folder,
+                              on_pick=lambda folder: service is self.current_service
+                              and self._move_summary(summary, folder))
+        picker.present(self)
+
+    # ------------------------------------------------------ context menu
+
+    def _setup_message_menu(self):
+        """Right-click (or long-press, or the Menu key) on a message: read state, move, archive, trash."""
+        self._menu_summary = None
+        self._menu_row = None
+        group = Gio.SimpleActionGroup()
+        for name, callback in (
+            ("toggle-read", lambda s: self._set_flag(s, "\\Seen", s.unread)),
+            ("move-to", self._choose_folder),
+            ("archive", lambda s: self._move_by_role(s, "archive")),
+            ("trash", lambda s: self._move_by_role(s, "trash")),
+        ):
+            action = Gio.SimpleAction.new(name, None)
+            action.connect("activate", lambda _a, _p, cb=callback: self._menu_summary and cb(self._menu_summary))
+            group.add_action(action)
+        self._menu_actions = group
+        self._list_box.insert_action_group("row", group)
+
+        self._message_popover = Gtk.PopoverMenu(has_arrow=False, halign=Gtk.Align.START)
+        self._message_popover.set_parent(self._list_box)
+        self._message_popover.connect("closed", self._on_message_menu_closed)
+
+        click = Gtk.GestureClick(button=Gdk.BUTTON_SECONDARY)
+        click.connect("pressed", lambda g, _n, x, y: self._on_list_context(g, x, y))
+        self.message_list.add_controller(click)
+        press = Gtk.GestureLongPress(touch_only=True)
+        press.connect("pressed", lambda g, x, y: self._on_list_context(g, x, y))
+        self.message_list.add_controller(press)
+
+        keys = Gtk.ShortcutController()
+        keys.add_shortcut(Gtk.Shortcut.new(
+            Gtk.ShortcutTrigger.parse_string("Menu|<Shift>F10"),
+            Gtk.CallbackAction.new(lambda *_a: self._on_list_menu_key())))
+        self.message_list.add_controller(keys)
+
+    def _on_list_context(self, gesture, x, y):
+        row = self.message_list.get_row_at_y(int(y))
+        if row is None:
+            return
+        gesture.set_state(Gtk.EventSequenceState.CLAIMED)
+        self._popup_message_menu(row, x, y)
+
+    def _on_list_menu_key(self):
+        row = self.get_focus()
+        while row is not None and not isinstance(row, MessageRow):
+            row = row.get_parent()
+        if row is None:
+            row = self.message_list.get_selected_row()
+        if row is None:
+            return False
+        bounds = row.compute_bounds(self.message_list)[1]
+        self._popup_message_menu(row, bounds.get_x() + 24, bounds.get_y() + bounds.get_height() / 2)
+        return True
+
+    def _popup_message_menu(self, row, x, y):
+        summary = row.summary
+        self._on_message_menu_closed()
+        self._menu_summary, self._menu_row = summary, row
+        row.add_css_class("context-target")  # shows which message the menu is about, without opening it
+
+        in_trash = self.current_folder.role == "trash"
+        menu = Gio.Menu()
+        section = Gio.Menu()
+        section.append(_("Mark as _Read") if summary.unread else _("Mark as _Unread"), "row.toggle-read")
+        menu.append_section(None, section)
+        section = Gio.Menu()
+        section.append(_("_Move to…"), "row.move-to")
+        section.append(_("_Archive"), "row.archive")
+        menu.append_section(None, section)
+        section = Gio.Menu()
+        section.append(_("_Delete Permanently…") if in_trash else _("Move to _Trash"), "row.trash")
+        menu.append_section(None, section)
+        self._menu_actions.lookup_action("archive").set_enabled(self._can_archive())
+        self._menu_actions.lookup_action("move-to").set_enabled(len(self.current_service.folders) > 1)
+
+        self._message_popover.set_menu_model(menu)
+        point = Graphene.Point()
+        point.x, point.y = x, y
+        ok, point = self.message_list.compute_point(self._list_box, point)
+        rect = Gdk.Rectangle()
+        rect.x, rect.y, rect.width, rect.height = int(point.x), int(point.y), 1, 1
+        self._message_popover.set_pointing_to(rect)
+        self._message_popover.popup()
+
+    def _on_message_menu_closed(self, *_args):
+        if self._menu_row is not None:
+            self._menu_row.remove_css_class("context-target")
+            self._menu_row = None
+        # The summary stays: the chosen item's action runs just after the menu closes.
+
+    # ----------------------------------------------------- drag and drop
+
+    def _make_draggable(self, row):
+        source = Gtk.DragSource(actions=Gdk.DragAction.MOVE)
+        source.connect("prepare", self._on_drag_prepare, row)
+        source.connect("drag-begin", self._on_drag_begin, row)
+        source.connect("drag-end", lambda *_a: setattr(self, "_dragging", None))
+        row.add_controller(source)
+
+    def _on_drag_prepare(self, _source, _x, _y, row):
+        if row.summary.uid not in self.rows:
+            return None
+        self._dragging = (self.current_service, self.current_folder, row.summary)
+        # Only Brev understands the payload; it is a plain string so nothing else mistakes it for files.
+        return Gdk.ContentProvider.new_for_value(f"brev-message:{row.summary.uid}")
+
+    def _on_drag_begin(self, source, _drag, row):
+        source.set_icon(Gtk.WidgetPaintable.new(row), 24, row.get_height() // 2)
+
+    def _make_drop_target(self, folder_row):
+        target = Gtk.DropTarget.new(GObject.TYPE_STRING, Gdk.DragAction.MOVE)
+        target.connect("accept", lambda _t, _drop: self._accepts_drop(folder_row))
+        target.connect("drop", lambda _t, value, _x, _y: self._on_folder_drop(folder_row, value))
+        folder_row.add_controller(target)
+
+    def _accepts_drop(self, folder_row):
+        if self._dragging is None:
+            return False
+        service, folder, _summary = self._dragging
+        return folder_row.service is service and folder_row.folder.name != folder.name
+
+    def _on_folder_drop(self, folder_row, value):
+        if self._dragging is None or not str(value).startswith("brev-message:") \
+                or not self._accepts_drop(folder_row):
+            return False
+        service, folder, summary = self._dragging
+        if service is not self.current_service or folder is not self.current_folder:
+            return False  # the list changed under the drag
+        self._move_summary(summary, folder_row.folder)
+        return True
 
     def _confirm_delete(self, summary):
         alert = Adw.AlertDialog(heading=_("Delete Message Permanently?"),

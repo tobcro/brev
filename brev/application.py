@@ -38,6 +38,7 @@ SHORTCUTS = [
         (_("Forward"), "win.forward", ["<Control>l"]),
         (_("Archive"), "win.archive", ["<Control>e"]),
         (_("Move to Trash"), "win.trash", ["Delete"]),
+        (_("Move to Folder"), "win.move-to", ["<Control><Shift>m"]),
         (_("Mark as Read/Unread"), "win.toggle-read", ["<Control>i"]),
         (_("Star/Unstar"), "win.toggle-star", ["<Control>d"]),
     ]),
