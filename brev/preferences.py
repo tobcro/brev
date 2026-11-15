@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from gettext import gettext as _
+from gettext import gettext as _, ngettext
 
 import gi
 
@@ -13,6 +13,16 @@ from gi.repository import Adw, GObject, Gtk  # noqa: E402
 from .html_view import AVAILABLE as HTML_AVAILABLE  # noqa: E402
 
 _FORMATS = ("plain", "html")
+_INTERVALS = (0, 15, 30, 60, 300, 900)  # seconds; 0 = off
+
+
+def _interval_label(seconds: int) -> str:
+    if seconds == 0:
+        return _("Off")
+    if seconds < 60:
+        return ngettext("{n} second", "{n} seconds", seconds).format(n=seconds)
+    minutes = seconds // 60
+    return ngettext("{n} minute", "{n} minutes", minutes).format(n=minutes)
 
 
 def _signature_editor(settings, key):
@@ -47,6 +57,30 @@ class PreferencesDialog(Adw.PreferencesDialog):
                                GObject.BindingFlags.BIDIRECTIONAL | GObject.BindingFlags.SYNC_CREATE)
         reading.add(images)
         page.add(reading)
+
+        # --- New mail and offline
+        mail = Adw.PreferencesGroup(title=_("New Mail and Offline"))
+        intervals = list(_INTERVALS)
+        if settings.refresh_interval not in intervals:  # a custom value from the settings file
+            intervals.append(settings.refresh_interval)
+            intervals.sort()
+        self._intervals = intervals
+        self.refresh_row = Adw.ComboRow(
+            title=_("Check for New Mail"),
+            subtitle=_("Off: only when you press Refresh."),
+            model=Gtk.StringList.new([_interval_label(i) for i in intervals]))
+        self.refresh_row.set_selected(intervals.index(settings.refresh_interval))
+        self.refresh_row.connect("notify::selected", lambda row, _p: settings.set_property(
+            "refresh-interval", self._intervals[row.get_selected()]))
+        mail.add(self.refresh_row)
+        self.cache_row = Adw.SpinRow.new_with_range(1, 365, 1)
+        self.cache_row.set_title(_("Keep Mail for Offline Use"))
+        self.cache_row.set_subtitle(_("Days of mail saved on this computer. Older mail is removed when Brev quits."))
+        self.cache_row.set_value(settings.cache_days)
+        self.cache_row.connect("notify::value", lambda row, _p: settings.set_property(
+            "cache-days", int(row.get_value())))
+        mail.add(self.cache_row)
+        page.add(mail)
 
         # --- Writing
         writing = Adw.PreferencesGroup(title=_("Writing"))

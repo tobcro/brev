@@ -22,8 +22,11 @@ class Settings(GObject.Object):
     compose_format = GObject.Property(type=str, default="plain")  # "plain" or "html"
     signature_new = GObject.Property(type=str, default="")
     signature_reply = GObject.Property(type=str, default="")
+    cache_days = GObject.Property(type=int, default=7, minimum=1, maximum=365)  # mail kept for offline use
+    refresh_interval = GObject.Property(type=int, default=15, minimum=0)  # seconds; 0 = no automatic checks
 
     _KEYS = ("always_show_images", "compose_format", "signature_new", "signature_reply")
+    _INT_KEYS = {"cache_days": (1, 365), "refresh_interval": (0, 24 * 3600)}
 
     def __init__(self, path: str):
         super().__init__()
@@ -44,6 +47,11 @@ class Settings(GObject.Object):
             keyfile.load_from_file(self.path, GLib.KeyFileFlags.NONE)
         except GLib.Error:
             return  # first run: defaults
+        for key, (low, high) in self._INT_KEYS.items():
+            try:
+                self.set_property(key, max(low, min(high, keyfile.get_integer(_GROUP, key))))
+            except GLib.Error:
+                pass  # missing or not a number: keep the default
         for key in self._KEYS:
             try:
                 if key == "always_show_images":
@@ -65,6 +73,8 @@ class Settings(GObject.Object):
         keyfile.set_boolean(_GROUP, "always_show_images", self.always_show_images)
         for key in ("compose_format", "signature_new", "signature_reply"):
             keyfile.set_string(_GROUP, key, self.get_property(key))
+        for key in self._INT_KEYS:
+            keyfile.set_integer(_GROUP, key, self.get_property(key))
         try:
             os.makedirs(os.path.dirname(self.path), exist_ok=True)
             keyfile.save_to_file(self.path)

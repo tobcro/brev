@@ -23,8 +23,7 @@ from .util import describe_error, format_full_date  # noqa: E402
 from .widgets import FolderRow, MessageRow, MessageView  # noqa: E402
 
 PAGE_SIZE = 50
-REFRESH_SECONDS = 120  # everything: all folder counts, reconnecting, the Outbox
-FOLDER_SYNC_SECONDS = 15  # just the selected folder
+MIN_FULL_REFRESH_SECONDS = 120  # all folder counts, reconnecting, the Outbox: never more often than this
 
 
 def _status_page(icon, title, description=""):
@@ -39,7 +38,6 @@ def _spinner_page(label):
     return box
 
 
-RECENT_SECONDS = 7 * 24 * 3600
 
 
 def _prefixed(subject: str, prefix: str) -> str:
@@ -87,8 +85,9 @@ class BrevWindow(Adw.ApplicationWindow):
         application.settings.connect("notify::always-show-images", lambda *_a: self.current_content is not None
                                      and self._render_content())
         self._load_accounts()
-        GLib.timeout_add_seconds(REFRESH_SECONDS, self._on_refresh_timer)
-        GLib.timeout_add_seconds(FOLDER_SYNC_SECONDS, self._on_folder_sync_timer)
+        self._sync_timer = self._refresh_timer = 0
+        self._schedule_refresh()
+        application.settings.connect("notify::refresh-interval", lambda *_a: self._schedule_refresh())
 
     # ================================================================ UI
 
@@ -664,7 +663,8 @@ class BrevWindow(Adw.ApplicationWindow):
 
     def _prefetch_recent(self, summaries):
         import time
-        recent = [s for s in summaries if s.timestamp >= time.time() - RECENT_SECONDS]
+        keep = self.get_application().settings.cache_days * 24 * 3600
+        recent = [s for s in summaries if s.timestamp >= time.time() - keep]
         if recent and self.current_service.online:
             ok, _bad = self._track(lambda _n: None)
             self.current_service.prefetch(self.current_folder.name, recent, done=ok)
@@ -980,6 +980,19 @@ class BrevWindow(Adw.ApplicationWindow):
             self.list_stack.set_visible_child_name("empty")
 
     # =========================================================== refresh
+
+    def _schedule_refresh(self):
+        """(Re)start the automatic checks from the "Check for New Mail" setting; 0 turns them off."""
+        for source in (self._sync_timer, self._refresh_timer):
+            if source:
+                GLib.source_remove(source)
+        self._sync_timer = self._refresh_timer = 0
+        interval = self.get_application().settings.refresh_interval
+        if interval <= 0:
+            return  # only the Refresh button checks
+        self._sync_timer = GLib.timeout_add_seconds(interval, self._on_folder_sync_timer)
+        self._refresh_timer = GLib.timeout_add_seconds(max(interval, MIN_FULL_REFRESH_SECONDS),
+                                                       self._on_refresh_timer)
 
     def _on_refresh_timer(self):
         self.refresh()

@@ -97,7 +97,7 @@ class BrevApplication(Adw.Application):
         if self._cache is None:
             self._cache = Cache(default_path(self.demo))
             # Also purge on start, in case the last session did not exit cleanly.
-            self._cache.purge()
+            self._cache.purge(keep_days=self.settings.cache_days)
         return self._cache
 
     @property
@@ -107,7 +107,7 @@ class BrevApplication(Adw.Application):
         return self._contacts
 
     def do_shutdown(self):
-        """Purge the cache down to the last KEEP_DAYS days of mail."""
+        """Purge the cache down to the last few days of mail (the "Keep Mail for Offline Use" setting)."""
         if self._cache is not None:
             accounts = None
             for window in self.get_windows():
@@ -117,7 +117,7 @@ class BrevApplication(Adw.Application):
                     if window.goa_client is not None or self.demo:
                         accounts = [s.account.id for s in window.services]
             try:
-                self._cache.purge(accounts=accounts)
+                self._cache.purge(keep_days=self.settings.cache_days, accounts=accounts)
             except Exception:
                 logging.getLogger(__name__).warning("Could not purge the cache", exc_info=True)
             self._cache.close()

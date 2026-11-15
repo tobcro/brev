@@ -40,7 +40,7 @@ It is deliberately **lean**:
   otherwise, so senders can't see when you open their newsletters.
 - **No gossip in your notifications.** "2 new emails have arrived." Not who,
   not what. Your lock screen is not a billboard.
-- **No forty pages of settings.** One window, four choices, sensible defaults.
+- **No forty pages of settings.** One window, a handful of choices, sensible defaults.
 
 ## What you get
 
@@ -52,8 +52,8 @@ It is deliberately **lean**:
 | Writing in plain text or HTML | ✔ Bold, lists, links, and pictures pasted straight from the clipboard |
 | Address suggestions as you type | ✔ From the contacts in your Online Accounts |
 | Adding someone who just wrote to you | ✔ Click their name in the email, *Add to Contacts*. Done |
-| Mail on the train | ✔ The last 7 days are kept for offline reading; replies wait in the Outbox |
-| Knowing when something arrives | ✔ A quiet GNOME notification, and the folder refreshes every 15 seconds |
+| Mail on the train | ✔ The last 7 days (or as many as you like) are kept for offline reading; replies wait in the Outbox |
+| Knowing when something arrives | ✔ A quiet GNOME notification; the folder refreshes every 15 seconds, less often, or only when you ask |
 | Only the stuff you haven't read | ✔ One button, and the list shows unread mail only |
 | Fitting in | ✔ libadwaita, dark mode, your icon theme, and a layout that works down to phone size |
 | A to-do list, a calendar and an AI butler | Not here. GNOME has apps for the first two. |
@@ -92,8 +92,8 @@ All of them.
 - Links open in your browser, never inside Brev.
 - Sign-in is handled by GNOME Online Accounts. Brev asks it for a token when it
   needs one and keeps nothing.
-- Mail is cached on your own computer (`~/.cache/brev`) and trimmed to the last
-  7 days whenever Brev quits.
+- Mail is cached on your own computer (`~/.cache/brev`) and trimmed whenever
+  Brev quits, to the last 7 days or however many you set.
 - New-mail notifications say how many emails arrived. That's all they say.
 
 ## Install
@@ -143,7 +143,7 @@ that never touches the network.
 ## Not done yet
 
 - No conversation threading. Every email stands on its own.
-- New mail is checked every 15 seconds rather than pushed by the server (IMAP IDLE).
+- New mail is checked on a timer (every 15 seconds by default) rather than pushed by the server (IMAP IDLE).
 - Drafts are not saved. Closing an unsent message asks before throwing it away.
 - One pair of signatures for all accounts.
 - Pictures are sent at full size, so a phone photo makes a hefty email.
