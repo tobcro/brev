@@ -65,3 +65,17 @@
   background-color: alpha(var(--accent-bg-color), .25);
   box-shadow: inset 0 0 0 2px var(--accent-bg-color);
 }
+
+/* Delete Contact: a solid red button with white text, like Save is solid blue. */
+button.delete-contact {
+  background-color: var(--destructive-bg-color);
+  color: var(--destructive-fg-color);
+}
+
+button.delete-contact:hover {
+  background-image: image(alpha(currentColor, .1));
+}
+
+button.delete-contact:active {
+  background-image: image(alpha(black, .2));
+}

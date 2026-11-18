@@ -107,8 +107,10 @@ class ContactEditor(Adw.Dialog):
 
         if contact is not None:
             danger = Adw.PreferencesGroup()
-            delete = Adw.ButtonRow(title=_("Delete Contact"), css_classes=["destructive-action"])
-            delete.connect("activated", lambda _r: self._confirm_delete())
+            # A plain button rather than a row: the same size and type as Save, filled red.
+            delete = Gtk.Button(label=_("_Delete Contact"), use_underline=True, hexpand=True,
+                                css_classes=["destructive-action", "delete-contact"])
+            delete.connect("clicked", lambda _b: self._confirm_delete())
             danger.add(delete)
             page.add(danger)
             source = book.sources.get(contact.source)
