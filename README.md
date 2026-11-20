@@ -100,8 +100,13 @@ All of them.
 ## Install
 
 Brev is tested on GNOME 51 with libadwaita 1.10. You need Python 3, PyGObject,
-GTK 4, libadwaita, the GNOME Online Accounts introspection data
-(`gir1.2-goa-1.0`) and, for HTML mail, WebKitGTK 6:
+GTK 4, libadwaita, the GNOME Online Accounts introspection data:
+
+```bash
+sudo apt install gir1.2-goa-1.0
+```
+
+And, for HTML mail, WebKitGTK 6:
 
 ```bash
 sudo apt install gir1.2-webkit-6.0
