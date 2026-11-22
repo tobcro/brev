@@ -220,7 +220,11 @@ class BrevWindow(Adw.ApplicationWindow):
                                         address_status=self._address_status)
         # No cross-fade here: fading snapshots the web view and can flash the previous message.
         self.message_stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.NONE)
-        self.message_stack.add_named(_status_page("mail-unread-symbolic", _("No Message Selected")), "empty")
+        # Until the first look at the server is done, the empty page welcomes instead (see _end_welcome).
+        self.message_empty = _status_page("brev-hourglass-symbolic", _("Welcome to Brev"),
+                                          _("Searching for new messages…"))
+        self._welcome = True
+        self.message_stack.add_named(self.message_empty, "empty")
         self.message_stack.add_named(_spinner_page(_("Opening message…")), "loading")
         self.message_stack.add_named(self.message_view, "message")
         self.message_error = _status_page("dialog-warning-symbolic", _("Could Not Open Message"))
@@ -438,6 +442,7 @@ class BrevWindow(Adw.ApplicationWindow):
         self.folder_list.remove_all()
         self._show_folder(None, None)
         if not services:
+            self._end_welcome()
             self.main_stack.set_visible_child_name("no-accounts")
             self._update_actions()
             return
@@ -466,10 +471,14 @@ class BrevWindow(Adw.ApplicationWindow):
             service.call("unread_counts", [f.name for f in folders if f.counts_unread], done=ok, error=bad)
 
         def error(err):
+            if not service.folders:
+                self._end_welcome()  # no folders, so no folder will finish loading
             if service in self.services and not isinstance(err, OfflineError):
                 self.toast(_("{account}: {error}").format(account=service.account.title, error=describe_error(err)))
 
         if not service.online:
+            if not service.folders:
+                self._end_welcome()
             return
         ok, bad = self._track(done, error)
         service.call("list_folders", False, done=ok, error=bad)
@@ -639,6 +648,7 @@ class BrevWindow(Adw.ApplicationWindow):
         self.list_stack.set_visible_child_name("list" if cached else "loading")
         self._update_actions()
         if not service.online:
+            self._end_welcome()  # nothing to search for while offline
             if not cached:
                 self._show_offline_list()
             return
@@ -646,6 +656,7 @@ class BrevWindow(Adw.ApplicationWindow):
         service.call("list_messages", folder.name, PAGE_SIZE, None, self.unread_only, done=ok, error=bad)
 
     def _on_server_page(self, result):
+        self._end_welcome()
         summaries, has_more = result
         live = {s.uid: s for s in summaries}
         lowest = min(live, default=0)
@@ -719,6 +730,7 @@ class BrevWindow(Adw.ApplicationWindow):
         self._check_fill_later()  # keep going if the view is not full yet
 
     def _on_list_error(self, err):
+        self._end_welcome()
         self._loading_more = False
         self.more_spinner.set_reveal_child(False)
         if isinstance(err, OfflineError):
@@ -793,6 +805,7 @@ class BrevWindow(Adw.ApplicationWindow):
         summary = row.summary
         if self.current_summary is summary and self.current_content is not None:
             return
+        self._end_welcome()
         self._message_token += 1
         token = self._message_token
         self.current_summary = summary
@@ -865,6 +878,15 @@ class BrevWindow(Adw.ApplicationWindow):
         self.message_error.set_icon_name("network-offline-symbolic" if offline else "dialog-warning-symbolic")
         self.message_error.set_description(describe_error(err))
         self.message_stack.set_visible_child_name("error")
+
+    def _end_welcome(self):
+        """The first search for mail is over (or a message was opened): back to the usual empty page."""
+        if not self._welcome:
+            return
+        self._welcome = False
+        self.message_empty.set_icon_name("mail-unread-symbolic")
+        self.message_empty.set_title(_("No Message Selected"))
+        self.message_empty.set_description("")
 
     def _show_message(self, row):
         if row is not None:
