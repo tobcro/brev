@@ -99,29 +99,38 @@ All of them.
 
 ## Install
 
-Brev is tested on GNOME 51 with libadwaita 1.10. You need Python 3, PyGObject,
-GTK 4, libadwaita, the GNOME Online Accounts introspection data:
-
 ```bash
-sudo apt install gir1.2-goa-1.0
+git clone https://github.com/tobcro/brev.git
+cd brev
+./install.sh
 ```
 
-And, for HTML mail, WebKitGTK 6:
+That's it. Brev shows up in your app grid and still runs from this folder.
 
-```bash
-sudo apt install gir1.2-webkit-6.0
-```
+> [!NOTE]
+> **`install.sh` installs the requirements for you.** It checks what Brev needs,
+> and if anything is missing it installs it with your distribution's package
+> manager (`apt`, `dnf`, `pacman` or `zypper`), so sudo will ask for your
+> password. Rather do that part yourself? Use `./install.sh --no-deps`.
 
-Run it straight from the checkout:
+Brev is tested on GNOME 51 with libadwaita 1.10. It needs Python 3, PyGObject,
+GTK 4, libadwaita, GNOME Online Accounts and WebKitGTK 6 (for HTML mail). If you
+want to install them by hand:
+
+| Distribution | Command |
+|---|---|
+| Debian, Ubuntu, Mint, Pop!\_OS | `sudo apt install python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 gir1.2-goa-1.0 gir1.2-webkit-6.0` |
+| Fedora | `sudo dnf install python3-gobject gtk4 libadwaita gnome-online-accounts-libs webkitgtk6.0` |
+| Arch, Manjaro, EndeavourOS | `sudo pacman -S python-gobject gtk4 libadwaita libgoa webkitgtk-6.0` |
+| openSUSE | `sudo zypper install python3-gobject typelib-1_0-Gtk-4_0 typelib-1_0-Adw-1 typelib-1_0-Goa-1_0 typelib-1_0-WebKit-6_0` |
+
+Something else? Look for the GObject introspection data ("typelib" or "gir")
+for those libraries, plus PyGObject.
+
+Or skip installing and run it straight from the checkout:
 
 ```bash
 ./bin/brev
-```
-
-Or add it to your app grid (it still runs from this folder):
-
-```bash
-./install.sh
 ```
 
 No accounts yet? Add one in **Settings → Online Accounts** with *Mail*
